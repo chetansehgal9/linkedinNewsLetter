@@ -67,8 +67,18 @@ def generate_draft(
     videos: list[dict],
     news_items: list[dict],
     writing_style: str | None = None,
+    feedback: str | None = None,
 ) -> dict:
-    """Generate a LinkedIn post draft using Claude."""
+    """Generate a LinkedIn post draft using Claude.
+
+    Args:
+        videos: YouTube video metadata dicts.
+        news_items: News article metadata dicts.
+        writing_style: Override the default writing style guide.
+        feedback: Optional revision instructions from a previous draft rejection.
+                  When provided, Claude rewrites using the same sources but applies
+                  the feedback (e.g. "make it shorter, focus on enterprise use cases").
+    """
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     style = writing_style or load_writing_style()
@@ -95,13 +105,23 @@ def generate_draft(
             )
         news_section = "## Relevant News / Trends\n" + "\n".join(news_lines)
 
+    feedback_section = ""
+    if feedback:
+        feedback_section = f"""## Revision Feedback
+The previous draft was not approved. Rewrite the post using the same sources above,
+but incorporate this feedback:
+
+{feedback.strip()}
+
+"""
+
     user_message = f"""Please write a LinkedIn newsletter post based on the following context.
 
 {video_section}
 
 {news_section}
 
-Create a post that:
+{feedback_section}Create a post that:
 1. Leads with the most compelling angle from the video + news combination
 2. Teaches something concrete (a insight, framework, or perspective)
 3. Connects the video to the broader trend shown in the news

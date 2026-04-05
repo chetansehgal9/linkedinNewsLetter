@@ -1,11 +1,11 @@
-// Called by generate_draft.yml after the draft is generated.
-// Reads .tmp/draft.json and opens a GitHub Issue for approval.
+// Called by recreate_draft.yml after the draft is regenerated.
+// Reads .tmp/new_draft.json and updates the existing GitHub Issue body.
 
 const fs = require('fs');
 const path = require('path');
 
 module.exports = async ({ github, context }) => {
-  const draftPath = path.join(process.env.GITHUB_WORKSPACE || '.', '.tmp', 'draft.json');
+  const draftPath = path.join(process.env.GITHUB_WORKSPACE || '.', '.tmp', 'new_draft.json');
   const draft = JSON.parse(fs.readFileSync(draftPath, 'utf8'));
 
   const title    = draft.title || 'Untitled';
@@ -47,13 +47,13 @@ module.exports = async ({ github, context }) => {
     hiddenJson,
   ].join('\n');
 
-  const issue = await github.rest.issues.create({
-    owner:  context.repo.owner,
-    repo:   context.repo.repo,
-    title:  `[LinkedIn Draft] ${title}`,
-    body:   issueBody,
-    labels: ['linkedin-draft'],
+  await github.rest.issues.update({
+    owner:        context.repo.owner,
+    repo:         context.repo.repo,
+    issue_number: context.payload.issue.number,
+    title:        `[LinkedIn Draft] ${title}`,
+    body:         issueBody,
   });
 
-  console.log(`Issue created: ${issue.data.html_url}`);
+  console.log(`Issue #${context.payload.issue.number} updated with new draft: ${title}`);
 };

@@ -36,7 +36,7 @@ LINKEDIN_ARTICLES_URL = "https://api.linkedin.com/rest/articles"
 LINKEDIN_USERINFO_URL  = "https://api.linkedin.com/v2/userinfo"
 
 # LinkedIn REST API version — bump this if LinkedIn rejects the request
-LINKEDIN_VERSION = "202410"
+LINKEDIN_VERSION = "202501"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -88,7 +88,6 @@ def _api_headers(access_token: str) -> dict:
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
         "LinkedIn-Version": LINKEDIN_VERSION,
-        "X-Restli-Protocol-Version": "2.0.0",
     }
 
 

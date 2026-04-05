@@ -1,0 +1,100 @@
+name: Recreate LinkedIn Draft
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  recreate:
+    # Trigger when comment starts with "recreate:" (case-sensitive),
+    # only the repo owner can request a regeneration,
+    # and the issue must be an open linkedin-draft.
+    if: >-
+      startsWith(github.event.comment.body, 'recreate:') &&
+      github.event.comment.user.login == github.repository_owner &&
+      contains(join(github.event.issue.labels.*.name, ','), 'linkedin-draft') &&
+      github.event.issue.state == 'open'
+
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Extract draft and feedback, then regenerate
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ISSUE_BODY:        ${{ github.event.issue.body }}
+          COMMENT_BODY:      ${{ github.event.comment.body }}
+        run: |
+          # Extract the JSON from the issue body and save the draft file
+          python3 - <<'PYEOF'
+          import os, re, json, sys
+          from pathlib import Path
+
+          issue_body   = os.environ["ISSUE_BODY"]
+          comment_body = os.environ["COMMENT_BODY"]
+
+          # Extract existing draft JSON
+          match = re.search(r'<!-- DRAFT_JSON\n(.*?)\nDRAFT_JSON -->', issue_body, re.DOTALL)
+          if not match:
+              print("ERROR: Could not find DRAFT_JSON in issue body", file=sys.stderr)
+              sys.exit(1)
+
+          Path('.tmp').mkdir(exist_ok=True)
+          Path('.tmp/draft.json').write_text(match.group(1))
+
+          # Extract feedback (everything after "recreate:")
+          feedback = comment_body[len('recreate:'):].strip()
+          if not feedback:
+              print("ERROR: No feedback text found after 'recreate:'", file=sys.stderr)
+              sys.exit(1)
+
+          Path('.tmp/feedback.txt').write_text(feedback)
+          print(f"Feedback: {feedback}")
+          PYEOF
+
+          FEEDBACK=$(cat .tmp/feedback.txt)
+          python agent.py --regenerate \
+            --draft-file .tmp/draft.json \
+            --feedback "$FEEDBACK" \
+            --output .tmp/new_draft.json
+
+      - name: Update issue with new draft
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fn = require('./.github/scripts/update_issue.js');
+            await fn({ github, context });
+
+      - name: React and confirm regeneration
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Thumbs-up on the recreate comment
+            await github.rest.reactions.createForIssueComment({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content:    '+1',
+            });
+
+            // Post confirmation comment
+            await github.rest.issues.createComment({
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: '✏️ **Draft regenerated with your feedback.** Review the updated issue body and comment `approve` when ready.',
+            });

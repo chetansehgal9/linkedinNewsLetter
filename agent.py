@@ -45,6 +45,44 @@ from tools.post_linkedin import post_draft
 from tools.notify import notify, load_pending, mark_processed, list_pending
 
 
+def regenerate_draft(
+    draft_file: str,
+    feedback: str,
+    output_file: str,
+) -> str | None:
+    """
+    Regenerate a draft using the same sources but applying user feedback.
+
+    Loads the existing draft (to extract its sources), calls Claude with
+    the original videos + news plus the feedback text, then saves the new
+    draft to output_file.
+
+    Returns the new draft title, or None on failure.
+    """
+    existing = json.loads(Path(draft_file).read_text())
+    sources = existing.get("sources", {})
+
+    videos = sources.get("videos", [])
+    news_items = sources.get("news", [])
+
+    print(f"\nRegenerating draft with feedback: {feedback!r}")
+    print(f"      Sources: {len(videos)} video(s), {len(news_items)} news item(s)")
+
+    try:
+        draft = generate_draft(videos, news_items, feedback=feedback)
+        print(f"      ✓ New draft: {draft.get('title', 'Untitled')}")
+        print(f"      ✓ Tokens: {draft.get('usage', {}).get('input_tokens', '?')} in / "
+              f"{draft.get('usage', {}).get('output_tokens', '?')} out")
+    except Exception as e:
+        print(f"      ✗ Draft regeneration failed: {e}")
+        return None
+
+    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+    Path(output_file).write_text(json.dumps(draft, indent=2))
+    print(f"\nNew draft saved to {output_file}")
+    return draft.get("title", "draft")
+
+
 def run_pipeline(
     video_urls: list[str] | None = None,
     topics: list[str] | None = None,
@@ -170,6 +208,8 @@ def main():
 
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--run", action="store_true", help="Run full pipeline")
+    action.add_argument("--regenerate", action="store_true",
+                        help="Regenerate a draft from an existing draft file with feedback")
     action.add_argument("--approve", metavar="POST_ID", help="Approve and post a draft")
     action.add_argument("--reject", metavar="POST_ID", help="Reject a draft")
     action.add_argument("--list", action="store_true", help="List pending drafts")
@@ -181,8 +221,23 @@ def main():
                         help="Generate draft but skip notification and posting")
     parser.add_argument("--output", metavar="FILE",
                         help="Save draft JSON to FILE instead of queuing (used by GitHub Actions)")
+    parser.add_argument("--draft-file", metavar="FILE",
+                        help="Existing draft JSON file (used with --regenerate)")
+    parser.add_argument("--feedback", metavar="TEXT",
+                        help="Revision instructions for --regenerate")
 
     args = parser.parse_args()
+
+    if args.regenerate:
+        if not args.draft_file:
+            print("ERROR: --regenerate requires --draft-file", file=sys.stderr)
+            sys.exit(1)
+        if not args.feedback:
+            print("ERROR: --regenerate requires --feedback", file=sys.stderr)
+            sys.exit(1)
+        output = args.output or args.draft_file.replace(".json", "_revised.json")
+        title = regenerate_draft(args.draft_file, args.feedback, output)
+        sys.exit(0 if title else 1)
 
     if args.list:
         pending = list_pending()
