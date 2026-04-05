@@ -109,27 +109,33 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Add a thumbs-up reaction to the approve comment
-            await github.rest.reactions.createForIssueComment({
-              owner:      context.repo.owner,
-              repo:       context.repo.repo,
-              comment_id: context.payload.comment.id,
-              content:    '+1',
-            });
+            const issueNumber = context.payload.issue?.number
+              || parseInt('${{ github.event.inputs.issue_number }}');
+            const commentId = context.payload.comment?.id;
+
+            // React to the approve comment (only available on issue_comment trigger)
+            if (commentId) {
+              await github.rest.reactions.createForIssueComment({
+                owner:      context.repo.owner,
+                repo:       context.repo.repo,
+                comment_id: commentId,
+                content:    '+1',
+              });
+            }
 
             // Post a success comment and close the issue
             await github.rest.issues.createComment({
-              owner:      context.repo.owner,
-              repo:       context.repo.repo,
-              issue_number: context.payload.issue.number,
-              body: '✅ **Posted to LinkedIn newsletter!** Issue closed.',
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: issueNumber,
+              body: '✅ **Posted to LinkedIn!** Issue closed.',
             });
 
             await github.rest.issues.update({
-              owner:      context.repo.owner,
-              repo:       context.repo.repo,
-              issue_number: context.payload.issue.number,
-              state: 'closed',
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: issueNumber,
+              state:        'closed',
               state_reason: 'completed',
             });
 
@@ -138,16 +144,22 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            await github.rest.reactions.createForIssueComment({
-              owner:      context.repo.owner,
-              repo:       context.repo.repo,
-              comment_id: context.payload.comment.id,
-              content:    '-1',
-            });
+            const issueNumber = context.payload.issue?.number
+              || parseInt('${{ github.event.inputs.issue_number }}');
+            const commentId = context.payload.comment?.id;
+
+            if (commentId) {
+              await github.rest.reactions.createForIssueComment({
+                owner:      context.repo.owner,
+                repo:       context.repo.repo,
+                comment_id: commentId,
+                content:    '-1',
+              });
+            }
 
             await github.rest.issues.createComment({
-              owner:      context.repo.owner,
-              repo:       context.repo.repo,
-              issue_number: context.payload.issue.number,
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: issueNumber,
               body: '❌ **Failed to post.** Check the [Actions log](${{ github.server_url }}/${{ github.repository }}/actions) for details.',
             });
