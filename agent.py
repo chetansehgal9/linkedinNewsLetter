@@ -49,6 +49,7 @@ def run_pipeline(
     video_urls: list[str] | None = None,
     topics: list[str] | None = None,
     dry_run: bool = False,
+    output_file: str | None = None,
 ) -> str | None:
     """
     Full pipeline: fetch content → generate draft → notify for approval.
@@ -117,7 +118,16 @@ def run_pipeline(
         print(json.dumps(draft, indent=2))
         return None
 
-    # ── Step 4: Queue for approval ─────────────────────────────────────────
+    # ── Step 4a: Save to file (GitHub Actions mode) ────────────────────────
+    if output_file:
+        from pathlib import Path
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+        Path(output_file).write_text(json.dumps(draft, indent=2))
+        print(f"\nDraft saved to {output_file}")
+        print(f"Title: {draft.get('title', 'Untitled')}")
+        return draft.get("title", "draft")
+
+    # ── Step 4b: Queue for approval (local mode) ───────────────────────────
     post_id = notify(draft)
     return post_id
 
@@ -169,6 +179,8 @@ def main():
     parser.add_argument("--topics", help="Comma-separated news topics to filter")
     parser.add_argument("--dry-run", action="store_true",
                         help="Generate draft but skip notification and posting")
+    parser.add_argument("--output", metavar="FILE",
+                        help="Save draft JSON to FILE instead of queuing (used by GitHub Actions)")
 
     args = parser.parse_args()
 
@@ -195,6 +207,7 @@ def main():
             video_urls=args.video_urls,
             topics=topics,
             dry_run=args.dry_run,
+            output_file=args.output,
         )
         if post_id:
             print(f"\nDraft queued with ID: {post_id}")

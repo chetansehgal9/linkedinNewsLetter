@@ -1,0 +1,101 @@
+name: Generate LinkedIn Draft
+
+on:
+  # Run every Monday at 9am UTC
+  schedule:
+    - cron: '0 9 * * 1'
+
+  # Also allow manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'YouTube video URL (optional)'
+        required: false
+        default: ''
+      topics:
+        description: 'News topic filter, comma-separated (optional)'
+        required: false
+        default: ''
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate draft
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NEWS_RSS_FEEDS: ${{ vars.NEWS_RSS_FEEDS }}
+          YOUTUBE_CHANNEL_ID: ${{ vars.YOUTUBE_CHANNEL_ID }}
+        run: |
+          VIDEO_ARG=""
+          if [ -n "${{ github.event.inputs.video_url }}" ]; then
+            VIDEO_ARG="--video-url ${{ github.event.inputs.video_url }}"
+          fi
+
+          TOPICS_ARG=""
+          if [ -n "${{ github.event.inputs.topics }}" ]; then
+            TOPICS_ARG="--topics '${{ github.event.inputs.topics }}'"
+          fi
+
+          python agent.py --run --output .tmp/draft.json $VIDEO_ARG $TOPICS_ARG
+
+      - name: Create GitHub Issue for approval
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const draft = JSON.parse(fs.readFileSync('.tmp/draft.json', 'utf8'));
+
+            const title   = draft.title || 'Untitled';
+            const body    = draft.body  || '';
+            const tags    = (draft.hashtags || []).map(t => `#${t.replace(/^#/, '')}`).join(' ');
+            const fullPost = tags ? `${body}\n\n${tags}` : body;
+
+            // Embed the full draft JSON as a hidden comment so the post workflow can read it
+            const hiddenJson = `<!-- DRAFT_JSON\n${JSON.stringify(draft)}\nDRAFT_JSON -->`;
+
+            const issueBody = `## 📝 LinkedIn Draft Ready for Approval
+
+**Title:** ${title}
+
+---
+
+${fullPost}
+
+---
+
+### Sources
+${(draft.sources?.videos || []).map(v => `- 🎥 [${v.title}](${v.url})`).join('\n') || '_No videos_'}
+${(draft.sources?.news  || []).map(n => `- 📰 [${n.title}](${n.url})`).join('\n') || '_No news_'}
+
+---
+
+### How to approve
+- ✅ **Approve & post:** Comment \`approve\` on this issue
+- ✏️ **Edit then approve:** Edit the post text above, then comment \`approve\`
+- ❌ **Reject:** Close this issue
+
+${hiddenJson}`;
+
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              title: `[LinkedIn Draft] ${title}`,
+              body:  issueBody,
+              labels: ['linkedin-draft'],
+            });
+
+            console.log(`Issue created: ${issue.data.html_url}`);

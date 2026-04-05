@@ -1,0 +1,127 @@
+name: Post to LinkedIn
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  post:
+    # Only run when:
+    # 1. The comment is exactly "approve" (case-insensitive)
+    # 2. The commenter is the repo owner (only YOU can approve)
+    # 3. The issue has the "linkedin-draft" label
+    if: |
+      contains(toLower(github.event.comment.body), 'approve') &&
+      github.event.comment.user.login == github.repository_owner &&
+      contains(join(github.event.issue.labels.*.name, ','), 'linkedin-draft') &&
+      github.event.issue.state == 'open'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Extract draft from issue and post to LinkedIn
+        id: post
+        env:
+          LINKEDIN_ACCESS_TOKEN:   ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN:     ${{ secrets.LINKEDIN_PERSON_URN }}
+          LINKEDIN_NEWSLETTER_URN: ${{ secrets.LINKEDIN_NEWSLETTER_URN }}
+          ISSUE_BODY:              ${{ github.event.issue.body }}
+        run: |
+          # Extract the JSON embedded in the issue body between <!-- DRAFT_JSON ... DRAFT_JSON -->
+          python3 - <<'PYEOF'
+          import os, re, json, sys
+          from pathlib import Path
+
+          issue_body = os.environ["ISSUE_BODY"]
+
+          match = re.search(r'<!-- DRAFT_JSON\n(.*?)\nDRAFT_JSON -->', issue_body, re.DOTALL)
+          if not match:
+              print("ERROR: Could not find DRAFT_JSON in issue body", file=sys.stderr)
+              sys.exit(1)
+
+          draft = json.loads(match.group(1))
+
+          # If the user edited the issue body, use the visible text instead of the embedded JSON body
+          # Extract the visible post text (between the --- separators)
+          visible_match = re.search(
+              r'---\n\n(.*?)\n\n---',
+              issue_body,
+              re.DOTALL
+          )
+          if visible_match:
+              visible_text = visible_match.group(1).strip()
+              # Separate hashtags from body
+              lines = visible_text.split('\n')
+              last_line = lines[-1] if lines else ''
+              if last_line.startswith('#'):
+                  draft['body']     = '\n'.join(lines[:-1]).strip()
+                  draft['hashtags'] = [t.lstrip('#') for t in last_line.split()]
+              else:
+                  draft['body'] = visible_text
+
+          Path('.tmp').mkdir(exist_ok=True)
+          Path('.tmp/approved_draft.json').write_text(json.dumps(draft, indent=2))
+          print(f"Draft extracted: {draft.get('title', 'Untitled')}")
+          PYEOF
+
+          python tools/post_linkedin.py --draft-file .tmp/approved_draft.json
+
+      - name: React to comment with success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Add a thumbs-up reaction to the approve comment
+            await github.rest.reactions.createForIssueComment({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content:    '+1',
+            });
+
+            // Post a success comment and close the issue
+            await github.rest.issues.createComment({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: '✅ **Posted to LinkedIn newsletter!** Issue closed.',
+            });
+
+            await github.rest.issues.update({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              issue_number: context.payload.issue.number,
+              state: 'closed',
+              state_reason: 'completed',
+            });
+
+      - name: React to comment with failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content:    '-1',
+            });
+
+            await github.rest.issues.createComment({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: '❌ **Failed to post.** Check the [Actions log](${{ github.server_url }}/${{ github.repository }}/actions) for details.',
+            });
