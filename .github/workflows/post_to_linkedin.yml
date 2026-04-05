@@ -17,7 +17,7 @@ jobs:
     # 3. The issue has the "linkedin-draft" label
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (contains(toLower(github.event.comment.body), 'approve') &&
+      (contains(github.event.comment.body, 'approve') &&
       github.event.comment.user.login == github.repository_owner &&
       contains(join(github.event.issue.labels.*.name, ','), 'linkedin-draft') &&
       github.event.issue.state == 'open')
