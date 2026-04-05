@@ -199,6 +199,13 @@ def post_draft(draft: dict) -> dict:
         if tag_line not in body_text:
             body_text = f"{body_text}\n\n{tag_line}"
 
+    # Append newsletter CTA
+    newsletter_urn = os.getenv("LINKEDIN_NEWSLETTER_URN", "")
+    if newsletter_urn:
+        newsletter_id = newsletter_urn.split(":")[-1]
+        newsletter_url = f"https://www.linkedin.com/newsletters/{newsletter_id}/"
+        body_text = f"{body_text}\n\n📬 Follow my newsletter for more: {newsletter_url}"
+
     return publish_post(body_text, access_token, person_urn)
 
 

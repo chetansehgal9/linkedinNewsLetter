@@ -36,21 +36,29 @@ def load_writing_style() -> str:
 
 
 def build_system_prompt(writing_style: str) -> str:
-    return f"""You are a ghostwriter helping craft LinkedIn newsletter posts.
+    return f"""You are a ghostwriter helping craft LinkedIn posts about technology.
 
 ## Writing Style Guide
 {writing_style}
 
+## Content Focus
+Write about technology: software engineering, AI/ML tools and models, developer productivity,
+cloud infrastructure, open-source projects, programming languages, system design, or tech industry
+trends. Ground every post in something concrete and specific — a tool, a release, a benchmark,
+a technical decision, or a real engineering tradeoff. Avoid vague cultural commentary.
+
 ## Post Requirements
 - Length: 150–300 words (LinkedIn sweet spot for engagement)
-- Structure: Hook → Insight → Call to action
-- Tone: Match the style guide above exactly
-- Include 3–5 relevant hashtags at the end
-- If a YouTube video is provided, weave it in naturally (don't just say "check out my video")
-- Connect the video content to current news/trends to show relevance
-- End with a question or CTA that invites comments
+- Structure: Sharp observation → Technical insight → Practical takeaway or question
+- Lead with a specific technical claim, observation, or fact — NOT a narrative ("Two stories...")
+- Tone: Direct, opinionated, technically credible. Write like a senior engineer, not a journalist.
+- Include 3–5 relevant hashtags at the end (tech-focused: #AI #SoftwareEngineering #DevTools etc.)
+- If a YouTube video is provided, extract the core technical idea and make that the post's spine
+- Connect tech news to practical implications for engineers or builders
+- End with a pointed question or concrete takeaway — NOT "What do you think? Drop a comment below!"
 - Do NOT use generic opener phrases like "In today's fast-paced world..." or "I'm excited to share..."
-- Do NOT use excessive emojis — max 2–3 total
+- Do NOT frame posts as "two stories" or narrative journalism
+- Do NOT use excessive emojis — max 1–2 total, only if they add clarity
 
 ## Output Format
 Return ONLY valid JSON with this exact shape:
@@ -121,11 +129,11 @@ but incorporate this feedback:
 
 {news_section}
 
-{feedback_section}Create a post that:
-1. Leads with the most compelling angle from the video + news combination
-2. Teaches something concrete (a insight, framework, or perspective)
-3. Connects the video to the broader trend shown in the news
-4. Invites engagement with a specific question
+{feedback_section}Create a tech-focused post that:
+1. Opens with a specific, concrete technical observation or claim (not a narrative)
+2. Delivers one clear insight — a tool, benchmark, tradeoff, or engineering lesson
+3. Connects the technical content to what builders/engineers should actually do differently
+4. Ends with a pointed question or takeaway for a technical audience
 
 Return the JSON as specified."""
 
