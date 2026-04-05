@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-Publish an approved draft as a LinkedIn Newsletter Article.
+Publish an approved draft as a LinkedIn post using the REST Posts API.
 
-Uses the LinkedIn Articles API (/rest/articles) — the correct endpoint for
-publishing content that actually appears inside a newsletter and notifies
-your subscribers. This is different from a regular LinkedIn post.
+Uses POST /rest/posts — the standard LinkedIn API for member posts.
+The post appears in the member's feed and is visible to connections/followers.
 
-Newsletter URN: urn:li:newsletter:7446074746422808576
-API docs: https://learn.microsoft.com/en-us/linkedin/marketing/integrations/community-management/articles
+Note: LinkedIn's newsletter article API (/rest/articles) requires Marketing
+Developer Platform partner access (business application required). This tool
+uses the standard Posts API which works with any approved w_member_social token.
+
+API docs: https://learn.microsoft.com/en-us/linkedin/marketing/integrations/community-management/shares/posts-api
 
 Requirements:
   - Access token with scope: w_member_social
-  - You must be the owner/admin of the newsletter
-  - LinkedIn-Version header: 202410
+  - LinkedIn-Version header: 202501
 
 Usage:
     python tools/post_linkedin.py --draft-file .tmp/pending_posts/abc123.json
@@ -32,8 +33,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-LINKEDIN_ARTICLES_URL = "https://api.linkedin.com/rest/articles"
-LINKEDIN_USERINFO_URL  = "https://api.linkedin.com/v2/userinfo"
+LINKEDIN_POSTS_URL    = "https://api.linkedin.com/rest/posts"
+LINKEDIN_USERINFO_URL = "https://api.linkedin.com/v2/userinfo"
 
 # LinkedIn REST API version — bump this if LinkedIn rejects the request
 LINKEDIN_VERSION = "202501"
@@ -88,37 +89,45 @@ def _api_headers(access_token: str) -> dict:
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
         "LinkedIn-Version": LINKEDIN_VERSION,
+        "X-Restli-Protocol-Version": "2.0.0",
     }
 
 
 # ── Core posting function ──────────────────────────────────────────────────────
 
-def publish_newsletter_article(
-    title: str,
-    body_html: str,
+def publish_post(
+    commentary: str,
     access_token: str,
     person_urn: str,
-    newsletter_urn: str,
 ) -> dict:
     """
-    Publish an article to a LinkedIn newsletter.
+    Publish a text post to LinkedIn using the Posts API.
 
-    Subscribers will receive a notification, and the article appears
-    in the newsletter's feed on LinkedIn.
+    The post appears in the author's feed and is visible to their connections
+    and followers. This uses the standard REST Posts API which is available
+    to all LinkedIn developers with the w_member_social scope.
 
-    Returns a dict with the article ID and URL.
+    Note: LinkedIn's newsletter article API (/rest/articles) requires
+    Marketing Developer Platform partner access and is not available to
+    standard developer apps. This posts to the member's feed instead.
+
+    Returns a dict with the post ID and URL.
     """
     payload = {
         "author": person_urn,
-        "title": title,
-        "body": body_html,                    # must be HTML
-        "newsletter": newsletter_urn,         # ties this article to the newsletter
+        "commentary": commentary,
         "visibility": "PUBLIC",
+        "distribution": {
+            "feedDistribution": "MAIN_FEED",
+            "targetEntities": [],
+            "thirdPartyDistributionChannels": [],
+        },
         "lifecycleState": "PUBLISHED",
+        "isReshareDisabledByAuthor": False,
     }
 
     resp = httpx.post(
-        LINKEDIN_ARTICLES_URL,
+        LINKEDIN_POSTS_URL,
         json=payload,
         headers=_api_headers(access_token),
         timeout=30,
@@ -127,22 +136,17 @@ def publish_newsletter_article(
     if resp.status_code not in (200, 201):
         _raise_linkedin_error(resp, payload)
 
-    # Article ID is returned in the Location header or response body
-    article_id = (
-        resp.headers.get("x-restli-id", "")
-        or resp.headers.get("location", "").rstrip("/").split("/")[-1]
-    )
+    # Post ID is returned in x-restli-id header
+    post_urn = resp.headers.get("x-restli-id", "")
+    post_id = post_urn.split(":")[-1] if post_urn else ""
 
-    newsletter_id = newsletter_urn.split(":")[-1]
     return {
-        "article_id": article_id,
+        "post_urn": post_urn,
         "status": "published",
-        "newsletter_url": f"https://www.linkedin.com/newsletters/{newsletter_id}/",
-        "article_url": (
-            f"https://www.linkedin.com/pulse/{article_id}/"
-            if article_id else ""
+        "url": (
+            f"https://www.linkedin.com/feed/update/{post_urn}/"
+            if post_urn else ""
         ),
-        "raw_response": resp.json() if resp.content else {},
     }
 
 
@@ -158,8 +162,8 @@ def _raise_linkedin_error(resp: httpx.Response, payload: dict) -> None:
         )
     elif resp.status_code == 422:
         hints = (
-            "\nHint: The newsletter URN may be wrong, or the article body contains "
-            "unsupported HTML. Try plain <p> tags only."
+            "\nHint: The request was rejected. Check that commentary is not empty "
+            "and that the author URN is correct."
         )
     raise RuntimeError(
         f"LinkedIn API returned {resp.status_code}: {resp.text}{hints}\n"
@@ -170,10 +174,9 @@ def _raise_linkedin_error(resp: httpx.Response, payload: dict) -> None:
 # ── Public interface ───────────────────────────────────────────────────────────
 
 def post_draft(draft: dict) -> dict:
-    """Publish an approved draft dict as a LinkedIn newsletter article."""
-    access_token   = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
-    person_urn     = os.getenv("LINKEDIN_PERSON_URN", "")
-    newsletter_urn = os.getenv("LINKEDIN_NEWSLETTER_URN", "urn:li:newsletter:7446074746422808576")
+    """Publish an approved draft dict as a LinkedIn post."""
+    access_token = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
+    person_urn   = os.getenv("LINKEDIN_PERSON_URN", "")
 
     if not access_token:
         raise ValueError("LINKEDIN_ACCESS_TOKEN is not set in .env")
@@ -188,7 +191,6 @@ def post_draft(draft: dict) -> dict:
             )
 
     body_text = draft.get("body", "")
-    title     = draft.get("title", "Untitled")
 
     # Append hashtags to end of body
     hashtags = draft.get("hashtags", [])
@@ -197,8 +199,7 @@ def post_draft(draft: dict) -> dict:
         if tag_line not in body_text:
             body_text = f"{body_text}\n\n{tag_line}"
 
-    body_html = plain_text_to_html(body_text)
-    return publish_newsletter_article(title, body_html, access_token, person_urn, newsletter_urn)
+    return publish_post(body_text, access_token, person_urn)
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
@@ -226,13 +227,18 @@ def main():
         sys.exit(1)
 
     if args.dry_run:
-        body_html = plain_text_to_html(draft.get("body", ""))
-        print("DRY RUN — payload that would be sent to LinkedIn Articles API:")
+        body_text = draft.get("body", "")
+        hashtags = draft.get("hashtags", [])
+        if hashtags:
+            tag_line = " ".join(f"#{t.lstrip('#')}" for t in hashtags)
+            if tag_line not in body_text:
+                body_text = f"{body_text}\n\n{tag_line}"
+        print("DRY RUN — payload that would be sent to LinkedIn Posts API:")
         print(json.dumps({
-            "title": draft.get("title"),
-            "body (HTML)": body_html,
-            "newsletter": os.getenv("LINKEDIN_NEWSLETTER_URN", "urn:li:newsletter:7446074746422808576"),
+            "author": os.getenv("LINKEDIN_PERSON_URN", "<urn:li:person:...>"),
+            "commentary": body_text,
             "visibility": "PUBLIC",
+            "distribution": {"feedDistribution": "MAIN_FEED"},
             "lifecycleState": "PUBLISHED",
         }, indent=2))
         sys.exit(0)
