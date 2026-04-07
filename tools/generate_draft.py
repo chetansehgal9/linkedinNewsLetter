@@ -26,7 +26,25 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-STYLE_FILE = Path(__file__).parent.parent / "workflows" / "writing_style.md"
+STYLE_FILE        = Path(__file__).parent.parent / "workflows" / "writing_style.md"
+POSTED_TOPICS_FILE = Path(__file__).parent.parent / "assets" / "posted_topics.txt"
+
+
+def load_posted_topics() -> list[str]:
+    """Load previously posted topics to avoid repetition."""
+    if POSTED_TOPICS_FILE.exists():
+        lines = POSTED_TOPICS_FILE.read_text().strip().splitlines()
+        return [l.strip() for l in lines if l.strip()]
+    return []
+
+
+def record_posted_topic(title: str) -> None:
+    """Append a new post title to the tracking file (keep last 10)."""
+    topics = load_posted_topics()
+    topics.append(title)
+    topics = topics[-10:]  # keep last 10 only
+    POSTED_TOPICS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    POSTED_TOPICS_FILE.write_text("\n".join(topics) + "\n")
 
 
 def load_writing_style() -> str:
@@ -125,13 +143,25 @@ but incorporate this feedback:
 
 """
 
+    # Add previously posted topics to avoid repetition
+    posted_topics = load_posted_topics()
+    avoid_section = ""
+    if posted_topics:
+        topics_list = "\n".join(f"- {t}" for t in posted_topics[-5:])
+        avoid_section = f"""## Recently Posted Topics (DO NOT repeat these)
+{topics_list}
+
+Pick a distinctly different angle or topic from the news sources above.
+
+"""
+
     user_message = f"""Please write a LinkedIn newsletter post based on the following context.
 
 {video_section}
 
 {news_section}
 
-{feedback_section}Create an AI-focused post that:
+{avoid_section}{feedback_section}Create an AI-focused post that:
 1. Opens with a specific, concrete observation about an AI model, tool, behaviour, or tradeoff
 2. Delivers one clear insight relevant to engineers and builders working with AI
 3. Connects the AI content to a practical implication — what should practitioners do differently?

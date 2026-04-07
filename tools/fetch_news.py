@@ -45,8 +45,13 @@ def parse_date(entry: dict) -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def fetch_feed(url: str, max_items: int = 5, topics: list[str] | None = None) -> list[dict]:
-    """Fetch articles from a single RSS feed, optionally filtered by topics."""
+def fetch_feed(
+    url: str,
+    max_items: int = 5,
+    topics: list[str] | None = None,
+    since_days: int | None = None,
+) -> list[dict]:
+    """Fetch articles from a single RSS feed, optionally filtered by topics and age."""
     # Fetch raw XML via httpx first (feedparser's built-in fetcher can fail
     # due to SSL/User-Agent issues in some environments), then parse the content.
     try:
@@ -62,11 +67,27 @@ def fetch_feed(url: str, max_items: int = 5, topics: list[str] | None = None) ->
         # Fall back to feedparser's native fetch
         feed = feedparser.parse(url)
 
+    cutoff = None
+    if since_days is not None:
+        cutoff = datetime.now(timezone.utc) - __import__("datetime").timedelta(days=since_days)
+
     articles = []
     for entry in feed.entries:
         title = entry.get("title", "")
         summary = entry.get("summary", entry.get("description", ""))
         link = entry.get("link", "")
+        published = parse_date(entry)
+
+        # Age filter: skip articles older than since_days
+        if cutoff:
+            try:
+                pub_dt = datetime.fromisoformat(published)
+                if pub_dt.tzinfo is None:
+                    pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                if pub_dt < cutoff:
+                    continue
+            except Exception:
+                pass  # keep article if date unparseable
 
         # Topic filter: skip if topics provided and none match title/summary
         if topics:
@@ -79,7 +100,7 @@ def fetch_feed(url: str, max_items: int = 5, topics: list[str] | None = None) ->
             "summary": _clean_html(summary)[:500],  # truncate long summaries
             "url": link,
             "source": feed.feed.get("title", url),
-            "published": parse_date(entry),
+            "published": published,
         })
 
         if len(articles) >= max_items:
@@ -98,12 +119,13 @@ def fetch_all_news(
     feed_urls: list[str],
     max_per_feed: int = 5,
     topics: list[str] | None = None,
+    since_days: int | None = 14,
 ) -> list[dict]:
     """Fetch articles from all configured RSS feeds."""
     all_articles = []
     for url in feed_urls:
         try:
-            articles = fetch_feed(url, max_per_feed, topics)
+            articles = fetch_feed(url, max_per_feed, topics, since_days=since_days)
             all_articles.extend(articles)
         except Exception as e:
             print(f"WARNING: Failed to fetch {url}: {e}", file=sys.stderr)

@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -110,6 +110,20 @@ jobs:
           fi
 
           python tools/post_linkedin.py --draft-file .tmp/approved_draft.json $IMAGE_ARG
+
+      - name: Record posted topic
+        if: success()
+        run: |
+          TITLE=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('title',''))" 2>/dev/null || echo "")
+          if [ -n "$TITLE" ]; then
+            mkdir -p assets
+            echo "$TITLE" >> assets/posted_topics.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add assets/posted_topics.txt
+            git commit -m "chore: record posted topic [skip ci]" || true
+            git push || true
+          fi
 
       - name: React to comment with success
         if: success()
