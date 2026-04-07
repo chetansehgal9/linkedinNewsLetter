@@ -24,13 +24,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Default feeds — override via NEWS_RSS_FEEDS env var or --feeds flag
-# Focused on engineering, AI/ML, and developer tools — not consumer tech or startup news
+# Focused exclusively on AI: models, research, tools, and AI engineering
 DEFAULT_FEEDS = [
-    "https://hnrss.org/frontpage",                           # Hacker News — engineering community
-    "https://www.infoq.com/feed/",                           # InfoQ — software architecture, dev practices
-    "https://github.blog/feed/",                             # GitHub Blog — open source, engineering
-    "https://newsletter.pragmaticengineer.com/feed",         # The Pragmatic Engineer
-    "https://tldr.tech/api/rss/tech",                        # TLDR Tech — curated dev news
+    "https://importai.substack.com/feed",       # Import AI — AI research weekly
+    "https://lastweekin.ai/feed",               # Last Week in AI — news roundup
+    "https://tldr.tech/api/rss/ai",             # TLDR AI — curated AI news
+    "https://huggingface.co/blog/feed.xml",     # Hugging Face Blog — models & tools
 ]
 
 

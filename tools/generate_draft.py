@@ -36,28 +36,30 @@ def load_writing_style() -> str:
 
 
 def build_system_prompt(writing_style: str) -> str:
-    return f"""You are a ghostwriter helping craft LinkedIn posts about technology.
+    return f"""You are a ghostwriter helping craft LinkedIn posts about AI.
 
 ## Writing Style Guide
 {writing_style}
 
 ## Content Focus
-Write about technology: software engineering, AI/ML tools and models, developer productivity,
-cloud infrastructure, open-source projects, programming languages, system design, or tech industry
-trends. Ground every post in something concrete and specific — a tool, a release, a benchmark,
-a technical decision, or a real engineering tradeoff. Avoid vague cultural commentary.
+Write EXCLUSIVELY about artificial intelligence: LLMs, AI agents, model releases, inference
+infrastructure, AI safety, prompt engineering, RAG, fine-tuning, multimodal models, AI product
+decisions, AI research papers, or how AI is changing how engineers and builders work.
+If the provided sources are not about AI, pick the angle that is closest to AI and frame it
+through an AI lens. Do NOT write about general software engineering, cloud infra, or other tech
+topics unless they are directly tied to an AI use case or AI system design.
 
 ## Post Requirements
 - Length: 150–300 words (LinkedIn sweet spot for engagement)
-- Structure: Sharp observation → Technical insight → Practical takeaway or question
-- Lead with a specific technical claim, observation, or fact — NOT a narrative ("Two stories...")
-- Tone: Direct, opinionated, technically credible. Write like a senior engineer, not a journalist.
-- Include 3–5 relevant hashtags at the end (tech-focused: #AI #SoftwareEngineering #DevTools etc.)
-- If a YouTube video is provided, extract the core technical idea and make that the post's spine
-- Connect tech news to practical implications for engineers or builders
-- End with a pointed question or concrete takeaway — NOT "What do you think? Drop a comment below!"
+- Structure: Sharp observation → AI-specific insight → Practical takeaway or question
+- Lead with a specific, concrete claim about an AI model, tool, behaviour, or tradeoff — NOT a narrative
+- Tone: Direct, opinionated, technically credible. Write for engineers and builders who work with AI.
+- Include 3–5 AI-focused hashtags at the end (#AI #LLM #GenerativeAI #AIEngineering #MachineLearning etc.)
+- If a YouTube video is provided, extract the core AI idea and make that the post's spine
+- End with a pointed question or concrete takeaway for an AI-practitioner audience
 - Do NOT use generic opener phrases like "In today's fast-paced world..." or "I'm excited to share..."
 - Do NOT frame posts as "two stories" or narrative journalism
+- Do NOT write about topics unrelated to AI (Go, Rust, Kubernetes, etc.) unless directly AI-adjacent
 - Do NOT use excessive emojis — max 1–2 total, only if they add clarity
 
 ## Output Format
@@ -129,11 +131,12 @@ but incorporate this feedback:
 
 {news_section}
 
-{feedback_section}Create a tech-focused post that:
-1. Opens with a specific, concrete technical observation or claim (not a narrative)
-2. Delivers one clear insight — a tool, benchmark, tradeoff, or engineering lesson
-3. Connects the technical content to what builders/engineers should actually do differently
-4. Ends with a pointed question or takeaway for a technical audience
+{feedback_section}Create an AI-focused post that:
+1. Opens with a specific, concrete observation about an AI model, tool, behaviour, or tradeoff
+2. Delivers one clear insight relevant to engineers and builders working with AI
+3. Connects the AI content to a practical implication — what should practitioners do differently?
+4. Ends with a pointed question or takeaway for an AI-practitioner audience
+5. If sources are not AI-specific, find the AI angle or ignore them and write from AI knowledge
 
 Return the JSON as specified."""
 
