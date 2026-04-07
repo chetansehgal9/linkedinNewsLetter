@@ -254,6 +254,15 @@ def post_draft(draft: dict, image_path: str | None = None) -> dict:
         if tag_line not in body_text:
             body_text = f"{body_text}\n\n{tag_line}"
 
+    # Append primary source article link
+    news_sources = draft.get("sources", {}).get("news", [])
+    if news_sources:
+        primary_url = news_sources[0].get("url", "")
+        primary_title = news_sources[0].get("title", "")
+        if primary_url:
+            label = f"📖 Read more: {primary_title}" if primary_title else "📖 Read more"
+            body_text = f"{body_text}\n\n{label}\n{primary_url}"
+
     # Append newsletter CTA
     newsletter_urn = os.getenv("LINKEDIN_NEWSLETTER_URN", "")
     if newsletter_urn:
