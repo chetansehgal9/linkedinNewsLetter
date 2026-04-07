@@ -263,14 +263,7 @@ def post_draft(draft: dict, image_path: str | None = None) -> dict:
             label = f"📖 Read more: {primary_title}" if primary_title else "📖 Read more"
             body_text = f"{body_text}\n\n{label}\n{primary_url}"
 
-    # Append newsletter CTA
-    newsletter_urn = os.getenv("LINKEDIN_NEWSLETTER_URN", "")
-    if newsletter_urn:
-        newsletter_id = newsletter_urn.split(":")[-1]
-        newsletter_url = f"https://www.linkedin.com/newsletters/{newsletter_id}/"
-        body_text = f"{body_text}\n\n📬 Follow my newsletter for more: {newsletter_url}"
-
-    # Upload image if provided
+# Upload image if provided
     image_urn = None
     if image_path and os.path.exists(image_path):
         print(f"Uploading image {image_path}...", file=sys.stderr)
