@@ -8,16 +8,17 @@ on:
       issue_number:
         description: 'Issue number to post from'
         required: true
+      skip_image:
+        description: 'Post without image (true/false)'
+        required: false
+        default: 'false'
 
 jobs:
   post:
-    # Only run when:
-    # 1. The comment is exactly "approve" (case-insensitive)
-    # 2. The commenter is the repo owner (only YOU can approve)
-    # 3. The issue has the "linkedin-draft" label
+    # Triggered by "post" or "post-no-image" comment from repo owner on an open linkedin-draft issue
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (contains(github.event.comment.body, 'approve') &&
+      ((github.event.comment.body == 'post' || github.event.comment.body == 'post-no-image') &&
       github.event.comment.user.login == github.repository_owner &&
       contains(join(github.event.issue.labels.*.name, ','), 'linkedin-draft') &&
       github.event.issue.state == 'open')
@@ -53,17 +54,16 @@ jobs:
             const fs = require('fs');
             fs.writeFileSync('/tmp/issue_body.txt', issue.data.body || '');
 
-      - name: Extract draft from issue and post to LinkedIn
+      - name: Extract draft and post to LinkedIn
         id: post
         env:
-          LINKEDIN_ACCESS_TOKEN:   ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
-          LINKEDIN_PERSON_URN:     ${{ secrets.LINKEDIN_PERSON_URN }}
-          LINKEDIN_NEWSLETTER_URN: ${{ secrets.LINKEDIN_NEWSLETTER_URN }}
-          OPENAI_API_KEY:          ${{ secrets.OPENAI_API_KEY }}
-          ISSUE_BODY:              ${{ github.event.issue.body }}
-          EVENT_NAME:              ${{ github.event_name }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN:   ${{ secrets.LINKEDIN_PERSON_URN }}
+          ISSUE_BODY:            ${{ github.event.issue.body }}
+          EVENT_NAME:            ${{ github.event_name }}
+          COMMENT_BODY:          ${{ github.event.comment.body }}
+          SKIP_IMAGE_INPUT:      ${{ github.event.inputs.skip_image }}
         run: |
-          # Extract the JSON embedded in the issue body between <!-- DRAFT_JSON ... DRAFT_JSON -->
           python3 - <<'PYEOF'
           import os, re, json, sys
           from pathlib import Path
@@ -80,16 +80,10 @@ jobs:
 
           draft = json.loads(match.group(1))
 
-          # If the user edited the issue body, use the visible text instead of the embedded JSON body
-          # Extract the visible post text (between the --- separators)
-          visible_match = re.search(
-              r'---\n\n(.*?)\n\n---',
-              issue_body,
-              re.DOTALL
-          )
+          # Honour any edits the user made to the visible post text
+          visible_match = re.search(r'---\n\n(.*?)\n\n---', issue_body, re.DOTALL)
           if visible_match:
               visible_text = visible_match.group(1).strip()
-              # Separate hashtags from body
               lines = visible_text.split('\n')
               last_line = lines[-1] if lines else ''
               if last_line.startswith('#'):
@@ -103,15 +97,15 @@ jobs:
           print(f"Draft extracted: {draft.get('title', 'Untitled')}")
           PYEOF
 
-          # Generate image with DALL-E 3 (skipped if OPENAI_API_KEY not set)
+          # Determine whether to attach the preview image
+          SKIP_IMAGE=false
+          if [ "$COMMENT_BODY" = "post-no-image" ] || [ "$SKIP_IMAGE_INPUT" = "true" ]; then
+            SKIP_IMAGE=true
+          fi
+
           IMAGE_ARG=""
-          if [ -n "$OPENAI_API_KEY" ]; then
-            TITLE=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('title',''))")
-            HOOK=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('hook',''))")
-            python tools/generate_image.py \
-              --title "$TITLE" \
-              --hook "$HOOK" \
-              --output .tmp/post_image.png && IMAGE_ARG="--image-path .tmp/post_image.png"
+          if [ "$SKIP_IMAGE" = "false" ] && [ -f "assets/drafts/preview.png" ]; then
+            IMAGE_ARG="--image-path assets/drafts/preview.png"
           fi
 
           python tools/post_linkedin.py --draft-file .tmp/approved_draft.json $IMAGE_ARG
@@ -125,7 +119,6 @@ jobs:
               || parseInt('${{ github.event.inputs.issue_number }}');
             const commentId = context.payload.comment?.id;
 
-            // React to the approve comment (only available on issue_comment trigger)
             if (commentId) {
               await github.rest.reactions.createForIssueComment({
                 owner:      context.repo.owner,
@@ -135,12 +128,11 @@ jobs:
               });
             }
 
-            // Post a success comment and close the issue
             await github.rest.issues.createComment({
               owner:        context.repo.owner,
               repo:         context.repo.repo,
               issue_number: issueNumber,
-              body: '✅ **Posted to LinkedIn!** Issue closed.',
+              body:         '✅ **Posted to LinkedIn!** Issue closed.',
             });
 
             await github.rest.issues.update({
@@ -173,5 +165,5 @@ jobs:
               owner:        context.repo.owner,
               repo:         context.repo.repo,
               issue_number: issueNumber,
-              body: '❌ **Failed to post.** Check the [Actions log](${{ github.server_url }}/${{ github.repository }}/actions) for details.',
+              body:         '❌ **Failed to post.** Check the [Actions log](${{ github.server_url }}/${{ github.repository }}/actions) for details.',
             });

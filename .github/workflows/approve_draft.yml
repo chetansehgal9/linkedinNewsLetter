@@ -1,0 +1,142 @@
+name: Approve Draft (Generate Image Preview)
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  preview:
+    # Triggered by exact "approve" comment from repo owner on an open linkedin-draft issue
+    if: >-
+      github.event.comment.body == 'approve' &&
+      github.event.comment.user.login == github.repository_owner &&
+      contains(join(github.event.issue.labels.*.name, ','), 'linkedin-draft') &&
+      github.event.issue.state == 'open'
+
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Extract draft and generate image
+        id: generate
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ISSUE_BODY:     ${{ github.event.issue.body }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, re, json, sys
+          from pathlib import Path
+
+          issue_body = os.environ["ISSUE_BODY"]
+          match = re.search(r'<!-- DRAFT_JSON\n(.*?)\nDRAFT_JSON -->', issue_body, re.DOTALL)
+          if not match:
+              print("ERROR: Could not find DRAFT_JSON in issue body", file=sys.stderr)
+              sys.exit(1)
+
+          draft = json.loads(match.group(1))
+
+          # Honour any edits the user made to the visible post text
+          visible_match = re.search(r'---\n\n(.*?)\n\n---', issue_body, re.DOTALL)
+          if visible_match:
+              visible_text = visible_match.group(1).strip()
+              lines = visible_text.split('\n')
+              last_line = lines[-1] if lines else ''
+              if last_line.startswith('#'):
+                  draft['body']     = '\n'.join(lines[:-1]).strip()
+                  draft['hashtags'] = [t.lstrip('#') for t in last_line.split()]
+              else:
+                  draft['body'] = visible_text
+
+          Path('.tmp').mkdir(exist_ok=True)
+          Path('.tmp/approved_draft.json').write_text(json.dumps(draft, indent=2))
+          print(f"Draft extracted: {draft.get('title', 'Untitled')}")
+          PYEOF
+
+          # Generate image with DALL-E 3
+          if [ -n "$OPENAI_API_KEY" ]; then
+            TITLE=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('title',''))")
+            HOOK=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('hook',''))")
+            python tools/generate_image.py \
+              --title "$TITLE" \
+              --hook "$HOOK" \
+              --output assets/drafts/preview.png
+            echo "image_generated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_generated=false" >> "$GITHUB_OUTPUT"
+            echo "WARNING: OPENAI_API_KEY not set — skipping image generation"
+          fi
+
+      - name: Commit preview image
+        if: steps.generate.outputs.image_generated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets/drafts/preview.png
+          git commit -m "chore: update draft preview image [skip ci]"
+          git push
+
+      - name: Post preview comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = context.payload.issue.number;
+            const commentId   = context.payload.comment.id;
+            const imageGenerated = '${{ steps.generate.outputs.image_generated }}' === 'true';
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            const imageSection = imageGenerated
+              ? `### 🖼️ Generated Image\n\n![Post Image](https://raw.githubusercontent.com/${owner}/${repo}/main/assets/drafts/preview.png)\n\n`
+              : `> ⚠️ Image generation skipped (OPENAI_API_KEY not set)\n\n`;
+
+            const body = [
+              '## 👀 Image Preview',
+              '',
+              imageSection,
+              '---',
+              '',
+              'Happy with the image? Comment `post` to publish to LinkedIn.',
+              'Want a new image? Comment `approve` again to regenerate.',
+              'Want to post without an image? Comment `post-no-image`.',
+            ].join('\n');
+
+            // React to the approve comment
+            await github.rest.reactions.createForIssueComment({
+              owner, repo, comment_id: commentId, content: 'eyes',
+            });
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: issueNumber, body,
+            });
+
+      - name: React with failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commentId = context.payload.comment.id;
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              comment_id: commentId, content: '-1',
+            });
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: '❌ **Image generation failed.** Check the [Actions log](${{ github.server_url }}/${{ github.repository }}/actions) for details.',
+            });
