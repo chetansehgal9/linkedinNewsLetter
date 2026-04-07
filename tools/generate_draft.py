@@ -50,7 +50,7 @@ through an AI lens. Do NOT write about general software engineering, cloud infra
 topics unless they are directly tied to an AI use case or AI system design.
 
 ## Post Requirements
-- Length: 150–300 words (LinkedIn sweet spot for engagement)
+- Length: 100–150 words (tight, punchy — every sentence must earn its place)
 - Structure: Sharp observation → AI-specific insight → Practical takeaway or question
 - Lead with a specific, concrete claim about an AI model, tool, behaviour, or tradeoff — NOT a narrative
 - Tone: Direct, opinionated, technically credible. Write for engineers and builders who work with AI.

@@ -35,6 +35,7 @@ load_dotenv()
 
 LINKEDIN_POSTS_URL    = "https://api.linkedin.com/rest/posts"
 LINKEDIN_USERINFO_URL = "https://api.linkedin.com/v2/userinfo"
+LINKEDIN_IMAGES_URL   = "https://api.linkedin.com/rest/images"
 
 # LinkedIn REST API version — bump this if LinkedIn rejects the request
 LINKEDIN_VERSION = "202504"
@@ -93,12 +94,54 @@ def _api_headers(access_token: str) -> dict:
     }
 
 
+# ── Image upload ───────────────────────────────────────────────────────────────
+
+def upload_image(image_path: str, access_token: str, person_urn: str) -> str:
+    """
+    Upload a local image to LinkedIn and return the image URN.
+
+    LinkedIn image upload is a two-step process:
+    1. Initialize upload → get uploadUrl + image URN
+    2. PUT the binary to uploadUrl
+    """
+    # Step 1: Initialize upload
+    init_resp = httpx.post(
+        f"{LINKEDIN_IMAGES_URL}?action=initializeUpload",
+        json={"initializeUploadRequest": {"owner": person_urn}},
+        headers=_api_headers(access_token),
+        timeout=15,
+    )
+    if init_resp.status_code not in (200, 201):
+        raise RuntimeError(
+            f"LinkedIn image upload init failed {init_resp.status_code}: {init_resp.text}"
+        )
+    data = init_resp.json().get("value", {})
+    upload_url = data["uploadUrl"]
+    image_urn = data["image"]
+
+    # Step 2: Upload binary
+    image_bytes = open(image_path, "rb").read()
+    put_resp = httpx.put(
+        upload_url,
+        content=image_bytes,
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=60,
+    )
+    if put_resp.status_code not in (200, 201):
+        raise RuntimeError(
+            f"LinkedIn image binary upload failed {put_resp.status_code}: {put_resp.text}"
+        )
+
+    return image_urn
+
+
 # ── Core posting function ──────────────────────────────────────────────────────
 
 def publish_post(
     commentary: str,
     access_token: str,
     person_urn: str,
+    image_urn: str | None = None,
 ) -> dict:
     """
     Publish a text post to LinkedIn using the Posts API.
@@ -125,6 +168,13 @@ def publish_post(
         "lifecycleState": "PUBLISHED",
         "isReshareDisabledByAuthor": False,
     }
+
+    if image_urn:
+        payload["content"] = {
+            "media": {
+                "id": image_urn,
+            }
+        }
 
     resp = httpx.post(
         LINKEDIN_POSTS_URL,
@@ -173,8 +223,13 @@ def _raise_linkedin_error(resp: httpx.Response, payload: dict) -> None:
 
 # ── Public interface ───────────────────────────────────────────────────────────
 
-def post_draft(draft: dict) -> dict:
-    """Publish an approved draft dict as a LinkedIn post."""
+def post_draft(draft: dict, image_path: str | None = None) -> dict:
+    """Publish an approved draft dict as a LinkedIn post.
+
+    Args:
+        draft: Draft JSON dict with body, hashtags, etc.
+        image_path: Optional local path to an image file to attach.
+    """
     access_token = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
     person_urn   = os.getenv("LINKEDIN_PERSON_URN", "")
 
@@ -206,7 +261,16 @@ def post_draft(draft: dict) -> dict:
         newsletter_url = f"https://www.linkedin.com/newsletters/{newsletter_id}/"
         body_text = f"{body_text}\n\n📬 Follow my newsletter for more: {newsletter_url}"
 
-    return publish_post(body_text, access_token, person_urn)
+    # Upload image if provided
+    image_urn = None
+    if image_path and os.path.exists(image_path):
+        print(f"Uploading image {image_path}...", file=sys.stderr)
+        image_urn = upload_image(image_path, access_token, person_urn)
+        print(f"Image URN: {image_urn}", file=sys.stderr)
+    elif image_path:
+        print(f"WARNING: Image file not found: {image_path}", file=sys.stderr)
+
+    return publish_post(body_text, access_token, person_urn, image_urn)
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
@@ -218,6 +282,7 @@ def main():
     parser.add_argument("--draft-file", help="Path to approved draft JSON file")
     parser.add_argument("--body",  help="Post body text (plain text, alternative to --draft-file)")
     parser.add_argument("--title", default="", help="Article title")
+    parser.add_argument("--image-path", help="Path to image file to attach to the post")
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -251,7 +316,7 @@ def main():
         sys.exit(0)
 
     try:
-        result = post_draft(draft)
+        result = post_draft(draft, image_path=args.image_path)
         print(json.dumps(result, indent=2))
         url = result.get("article_url") or result.get("newsletter_url", "")
         print(f"\nPublished to newsletter: {url}", file=sys.stderr)

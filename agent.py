@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from tools.fetch_youtube import fetch_latest_videos, fetch_video_metadata
 from tools.fetch_news import fetch_all_news
 from tools.generate_draft import generate_draft
+from tools.generate_image import generate_image
 from tools.post_linkedin import post_draft
 from tools.notify import notify, load_pending, mark_processed, list_pending
 
@@ -151,6 +152,23 @@ def run_pipeline(
         print(f"      ✗ Draft generation failed: {e}")
         return None
 
+    # ── Step 3b: Generate image ────────────────────────────────────────────
+    image_path = None
+    if os.getenv("OPENAI_API_KEY"):
+        print(f"\n[3b] Generating post image with DALL-E 3...")
+        try:
+            image_path = generate_image(
+                title=draft.get("title", ""),
+                hook=draft.get("hook", ""),
+                output_path=".tmp/post_image.png",
+            )
+            draft["image_path"] = image_path
+            print(f"      ✓ Image saved to {image_path}")
+        except Exception as e:
+            print(f"      ✗ Image generation failed (post will continue without image): {e}")
+    else:
+        print("\n[3b] OPENAI_API_KEY not set — skipping image generation")
+
     if dry_run:
         print("\n── DRY RUN — Draft (not queued) ──")
         print(json.dumps(draft, indent=2))
@@ -181,8 +199,10 @@ def approve_and_post(post_id: str) -> bool:
     print(f"\nApproving post: {draft.get('title', 'Untitled')}")
     print("Posting to LinkedIn newsletter...")
 
+    image_path = draft.get("image_path")
+
     try:
-        result = post_draft(draft)
+        result = post_draft(draft, image_path=image_path)
         mark_processed(post_id, "approved")
         print(f"\nPosted! {result.get('url') or result.get('newsletter_url', '')}")
         print(json.dumps(result, indent=2))

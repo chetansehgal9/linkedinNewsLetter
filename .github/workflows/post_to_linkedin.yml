@@ -59,6 +59,7 @@ jobs:
           LINKEDIN_ACCESS_TOKEN:   ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN:     ${{ secrets.LINKEDIN_PERSON_URN }}
           LINKEDIN_NEWSLETTER_URN: ${{ secrets.LINKEDIN_NEWSLETTER_URN }}
+          OPENAI_API_KEY:          ${{ secrets.OPENAI_API_KEY }}
           ISSUE_BODY:              ${{ github.event.issue.body }}
           EVENT_NAME:              ${{ github.event_name }}
         run: |
@@ -102,7 +103,18 @@ jobs:
           print(f"Draft extracted: {draft.get('title', 'Untitled')}")
           PYEOF
 
-          python tools/post_linkedin.py --draft-file .tmp/approved_draft.json
+          # Generate image with DALL-E 3 (skipped if OPENAI_API_KEY not set)
+          IMAGE_ARG=""
+          if [ -n "$OPENAI_API_KEY" ]; then
+            TITLE=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('title',''))")
+            HOOK=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('hook',''))")
+            python tools/generate_image.py \
+              --title "$TITLE" \
+              --hook "$HOOK" \
+              --output .tmp/post_image.png && IMAGE_ARG="--image-path .tmp/post_image.png"
+          fi
+
+          python tools/post_linkedin.py --draft-file .tmp/approved_draft.json $IMAGE_ARG
 
       - name: React to comment with success
         if: success()
