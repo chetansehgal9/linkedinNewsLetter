@@ -18,7 +18,7 @@ jobs:
     # Triggered by "post" or "post-no-image" comment from repo owner on an open linkedin-draft issue
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      ((github.event.comment.body == 'post' || github.event.comment.body == 'post-no-image') &&
+      (startsWith(github.event.comment.body, 'post') &&
       github.event.comment.user.login == github.repository_owner &&
       contains(join(github.event.issue.labels.*.name, ','), 'linkedin-draft') &&
       github.event.issue.state == 'open')
@@ -99,7 +99,8 @@ jobs:
 
           # Determine whether to attach the preview image
           SKIP_IMAGE=false
-          if [ "$COMMENT_BODY" = "post-no-image" ] || [ "$SKIP_IMAGE_INPUT" = "true" ]; then
+          COMMENT_TRIMMED=$(echo "$COMMENT_BODY" | tr -d '[:space:]')
+          if [ "$COMMENT_TRIMMED" = "post-no-image" ] || [ "$SKIP_IMAGE_INPUT" = "true" ]; then
             SKIP_IMAGE=true
           fi
 

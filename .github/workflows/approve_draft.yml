@@ -8,7 +8,8 @@ jobs:
   preview:
     # Triggered by exact "approve" comment from repo owner on an open linkedin-draft issue
     if: >-
-      github.event.comment.body == 'approve' &&
+      startsWith(github.event.comment.body, 'approve') &&
+      !startsWith(github.event.comment.body, 'approve-') &&
       github.event.comment.user.login == github.repository_owner &&
       contains(join(github.event.issue.labels.*.name, ','), 'linkedin-draft') &&
       github.event.issue.state == 'open'
