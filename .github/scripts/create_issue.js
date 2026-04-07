@@ -47,6 +47,24 @@ module.exports = async ({ github, context }) => {
     hiddenJson,
   ].join('\n');
 
+  // Close any previously open draft issues so only one is active at a time
+  const existing = await github.rest.issues.listForRepo({
+    owner:  context.repo.owner,
+    repo:   context.repo.repo,
+    labels: 'linkedin-draft',
+    state:  'open',
+  });
+  for (const old of existing.data) {
+    await github.rest.issues.update({
+      owner:        context.repo.owner,
+      repo:         context.repo.repo,
+      issue_number: old.number,
+      state:        'closed',
+      state_reason: 'not_planned',
+    });
+    console.log(`Closed stale draft issue #${old.number}`);
+  }
+
   const issue = await github.rest.issues.create({
     owner:  context.repo.owner,
     repo:   context.repo.repo,

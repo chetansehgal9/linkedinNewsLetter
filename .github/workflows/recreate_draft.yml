@@ -6,11 +6,12 @@ on:
 
 jobs:
   recreate:
-    # Trigger when comment starts with "recreate:" (case-sensitive),
+    # Trigger when comment starts with "recreate:" or "Recreate:" (case-insensitive for first char),
     # only the repo owner can request a regeneration,
     # and the issue must be an open linkedin-draft.
     if: >-
-      startsWith(github.event.comment.body, 'recreate:') &&
+      (startsWith(github.event.comment.body, 'recreate:') ||
+      startsWith(github.event.comment.body, 'Recreate:')) &&
       github.event.comment.user.login == github.repository_owner &&
       contains(join(github.event.issue.labels.*.name, ','), 'linkedin-draft') &&
       github.event.issue.state == 'open'

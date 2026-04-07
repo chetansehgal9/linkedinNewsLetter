@@ -24,10 +24,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Default feeds — override via NEWS_RSS_FEEDS env var or --feeds flag
+# Focused on engineering, AI/ML, and developer tools — not consumer tech or startup news
 DEFAULT_FEEDS = [
-    "https://feeds.feedburner.com/TechCrunch",
-    "https://www.theverge.com/rss/index.xml",
-    "https://hnrss.org/frontpage",  # Hacker News
+    "https://hnrss.org/frontpage",                           # Hacker News — engineering community
+    "https://www.infoq.com/feed/",                           # InfoQ — software architecture, dev practices
+    "https://github.blog/feed/",                             # GitHub Blog — open source, engineering
+    "https://newsletter.pragmaticengineer.com/feed",         # The Pragmatic Engineer
+    "https://tldr.tech/api/rss/tech",                        # TLDR Tech — curated dev news
 ]
 
 

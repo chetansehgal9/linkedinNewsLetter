@@ -172,6 +172,13 @@ Return the JSON as specified."""
             "cta": "",
         }
 
+    # Strip trailing hashtag lines from body — Claude embeds them there, but
+    # they're also stored in draft["hashtags"], so appending both would duplicate.
+    body_lines = draft.get("body", "").rstrip().split("\n")
+    while body_lines and all(w.startswith("#") for w in body_lines[-1].split() if w):
+        body_lines.pop()
+    draft["body"] = "\n".join(body_lines).rstrip()
+
     # Enrich with source metadata
     draft["sources"] = {
         "videos": [{"title": v.get("title"), "url": v.get("url")} for v in videos],
