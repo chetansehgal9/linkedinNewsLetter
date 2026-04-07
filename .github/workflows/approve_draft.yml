@@ -68,15 +68,19 @@ jobs:
           print(f"Draft extracted: {draft.get('title', 'Untitled')}")
           PYEOF
 
-          # Generate image with DALL-E 3
+          # Generate image with DALL-E 3 (failures are non-fatal)
           if [ -n "$OPENAI_API_KEY" ]; then
             TITLE=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('title',''))")
             HOOK=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('hook',''))")
-            python tools/generate_image.py \
+            if python tools/generate_image.py \
               --title "$TITLE" \
               --hook "$HOOK" \
-              --output assets/drafts/preview.png
-            echo "image_generated=true" >> "$GITHUB_OUTPUT"
+              --output assets/drafts/preview.png; then
+              echo "image_generated=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "WARNING: Image generation failed — will post without image" >&2
+              echo "image_generated=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "image_generated=false" >> "$GITHUB_OUTPUT"
             echo "WARNING: OPENAI_API_KEY not set — skipping image generation"
