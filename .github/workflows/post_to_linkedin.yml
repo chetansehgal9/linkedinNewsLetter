@@ -104,8 +104,8 @@ jobs:
           fi
 
           IMAGE_ARG=""
-          if [ "$SKIP_IMAGE" = "false" ] && [ -f "assets/drafts/preview.png" ]; then
-            IMAGE_ARG="--image-path assets/drafts/preview.png"
+          if [ "$SKIP_IMAGE" = "false" ] && [ -f "assets/drafts/preview.jpg" ]; then
+            IMAGE_ARG="--image-path assets/drafts/preview.jpg"
           fi
 
           python tools/post_linkedin.py --draft-file .tmp/approved_draft.json $IMAGE_ARG

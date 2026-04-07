@@ -36,8 +36,8 @@ jobs:
       - name: Extract draft and generate image
         id: generate
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ISSUE_BODY:     ${{ github.event.issue.body }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          ISSUE_BODY:          ${{ github.event.issue.body }}
         run: |
           python3 - <<'PYEOF'
           import os, re, json, sys
@@ -68,14 +68,14 @@ jobs:
           print(f"Draft extracted: {draft.get('title', 'Untitled')}")
           PYEOF
 
-          # Generate image with DALL-E 3 (failures are non-fatal)
-          if [ -n "$OPENAI_API_KEY" ]; then
+          # Fetch image from Unsplash (failures are non-fatal)
+          if [ -n "$UNSPLASH_ACCESS_KEY" ]; then
             TITLE=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('title',''))")
             HOOK=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('hook',''))")
             if python tools/generate_image.py \
               --title "$TITLE" \
               --hook "$HOOK" \
-              --output assets/drafts/preview.png; then
+              --output assets/drafts/preview.jpg; then
               echo "image_generated=true" >> "$GITHUB_OUTPUT"
             else
               echo "WARNING: Image generation failed — will post without image" >&2
@@ -83,7 +83,7 @@ jobs:
             fi
           else
             echo "image_generated=false" >> "$GITHUB_OUTPUT"
-            echo "WARNING: OPENAI_API_KEY not set — skipping image generation"
+            echo "WARNING: UNSPLASH_ACCESS_KEY not set — skipping image fetch"
           fi
 
       - name: Commit preview image
@@ -91,7 +91,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add assets/drafts/preview.png
+          git add assets/drafts/preview.jpg
           git commit -m "chore: update draft preview image [skip ci]"
           git push
 
@@ -106,7 +106,7 @@ jobs:
             const repo  = context.repo.repo;
 
             const imageSection = imageGenerated
-              ? `### 🖼️ Generated Image\n\n![Post Image](https://raw.githubusercontent.com/${owner}/${repo}/main/assets/drafts/preview.png)\n\n`
+              ? `### 🖼️ Generated Image\n\n![Post Image](https://raw.githubusercontent.com/${owner}/${repo}/main/assets/drafts/preview.jpg)\n\n`
               : `> ⚠️ Image generation skipped (OPENAI_API_KEY not set)\n\n`;
 
             const body = [
