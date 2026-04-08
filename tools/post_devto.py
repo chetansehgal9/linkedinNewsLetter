@@ -29,6 +29,7 @@ def publish_to_devto(
     tags: list[str],
     api_key: str,
     canonical_url: str = "",
+    cover_image_url: str = "",
 ) -> dict:
     """Publish a Markdown article to Dev.to. Returns post URL and ID."""
     article = {
@@ -39,6 +40,8 @@ def publish_to_devto(
     }
     if canonical_url:
         article["canonical_url"] = canonical_url
+    if cover_image_url:
+        article["main_image"] = cover_image_url
 
     resp = httpx.post(
         DEVTO_API_URL,
@@ -62,7 +65,7 @@ def publish_to_devto(
     }
 
 
-def post_blog_to_devto(draft: dict) -> dict:
+def post_blog_to_devto(draft: dict, cover_image_url: str = "") -> dict:
     api_key = os.getenv("DEVTO_API_KEY", "")
     if not api_key:
         raise ValueError("DEVTO_API_KEY is not set")
@@ -77,12 +80,14 @@ def post_blog_to_devto(draft: dict) -> dict:
         tags=blog.get("tags", ["ai"]),
         api_key=api_key,
         canonical_url=blog.get("canonical_url", ""),
+        cover_image_url=cover_image_url,
     )
 
 
 def main():
     parser = argparse.ArgumentParser(description="Publish blog to Dev.to")
     parser.add_argument("--draft-file", required=True, help="Path to draft JSON")
+    parser.add_argument("--cover-image-url", default="", help="Public URL of cover image")
     parser.add_argument("--dry-run", action="store_true", help="Print payload, don't post")
     args = parser.parse_args()
 
@@ -106,7 +111,7 @@ def main():
         sys.exit(0)
 
     try:
-        result = post_blog_to_devto(draft)
+        result = post_blog_to_devto(draft, cover_image_url=args.cover_image_url)
         print(json.dumps(result, indent=2))
         print(f"\nPublished to Dev.to: {result.get('url', '')}", file=sys.stderr)
     except Exception as e:

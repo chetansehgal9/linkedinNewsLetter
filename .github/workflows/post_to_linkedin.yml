@@ -113,7 +113,12 @@ jobs:
           # Publish to Dev.to first so we can include the link in the LinkedIn post
           DEVTO_URL=""
           if [ -n "$DEVTO_API_KEY" ]; then
-            DEVTO_RESULT=$(python3 tools/post_devto.py --draft-file .tmp/approved_draft.json 2>/dev/null || echo "{}")
+            COVER_IMAGE_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/assets/drafts/preview.jpg"
+          COVER_ARG=""
+          if [ -f "assets/drafts/preview.jpg" ]; then
+            COVER_ARG="--cover-image-url $COVER_IMAGE_URL"
+          fi
+          DEVTO_RESULT=$(python3 tools/post_devto.py --draft-file .tmp/approved_draft.json $COVER_ARG 2>/dev/null || echo "{}")
             DEVTO_URL=$(python3 -c "import json,sys; d=json.loads('''$DEVTO_RESULT'''); print(d.get('url',''))" 2>/dev/null || echo "")
             echo "Dev.to URL: $DEVTO_URL"
           fi
