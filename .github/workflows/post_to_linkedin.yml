@@ -111,15 +111,16 @@ jobs:
 
           python tools/post_linkedin.py --draft-file .tmp/approved_draft.json $IMAGE_ARG
 
-      - name: Publish to Medium
+      - name: Publish to Hashnode
         continue-on-error: true
         env:
-          MEDIUM_INTEGRATION_TOKEN: ${{ secrets.MEDIUM_INTEGRATION_TOKEN }}
+          HASHNODE_TOKEN:          ${{ secrets.HASHNODE_TOKEN }}
+          HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
         run: |
-          if [ -n "$MEDIUM_INTEGRATION_TOKEN" ]; then
-            python tools/post_medium.py --draft-file .tmp/approved_draft.json
+          if [ -n "$HASHNODE_TOKEN" ] && [ -n "$HASHNODE_PUBLICATION_ID" ]; then
+            python tools/post_hashnode.py --draft-file .tmp/approved_draft.json
           else
-            echo "MEDIUM_INTEGRATION_TOKEN not set — skipping Medium publish"
+            echo "HASHNODE_TOKEN or HASHNODE_PUBLICATION_ID not set — skipping Hashnode publish"
           fi
 
       - name: Publish to Dev.to
