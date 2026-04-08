@@ -111,18 +111,6 @@ jobs:
 
           python tools/post_linkedin.py --draft-file .tmp/approved_draft.json $IMAGE_ARG
 
-      - name: Publish to Hashnode
-        continue-on-error: true
-        env:
-          HASHNODE_TOKEN:          ${{ secrets.HASHNODE_TOKEN }}
-          HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
-        run: |
-          if [ -n "$HASHNODE_TOKEN" ] && [ -n "$HASHNODE_PUBLICATION_ID" ]; then
-            python tools/post_hashnode.py --draft-file .tmp/approved_draft.json
-          else
-            echo "HASHNODE_TOKEN or HASHNODE_PUBLICATION_ID not set — skipping Hashnode publish"
-          fi
-
       - name: Publish to Dev.to
         continue-on-error: true
         env:
