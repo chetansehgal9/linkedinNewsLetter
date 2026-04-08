@@ -223,6 +223,15 @@ Return the JSON as specified."""
         "output_tokens": response.usage.output_tokens,
     }
 
+    # Generate expanded blog article for Medium + Dev.to
+    try:
+        from tools.generate_blog import generate_blog
+        print("Generating blog article...", file=sys.stderr)
+        draft["blog"] = generate_blog(draft)
+        print(f"Blog generated: {draft['blog'].get('title', '')}", file=sys.stderr)
+    except Exception as e:
+        print(f"WARNING: Blog generation failed (LinkedIn draft unaffected): {e}", file=sys.stderr)
+
     return draft
 
 

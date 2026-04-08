@@ -111,6 +111,28 @@ jobs:
 
           python tools/post_linkedin.py --draft-file .tmp/approved_draft.json $IMAGE_ARG
 
+      - name: Publish to Medium
+        continue-on-error: true
+        env:
+          MEDIUM_INTEGRATION_TOKEN: ${{ secrets.MEDIUM_INTEGRATION_TOKEN }}
+        run: |
+          if [ -n "$MEDIUM_INTEGRATION_TOKEN" ]; then
+            python tools/post_medium.py --draft-file .tmp/approved_draft.json
+          else
+            echo "MEDIUM_INTEGRATION_TOKEN not set — skipping Medium publish"
+          fi
+
+      - name: Publish to Dev.to
+        continue-on-error: true
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+        run: |
+          if [ -n "$DEVTO_API_KEY" ]; then
+            python tools/post_devto.py --draft-file .tmp/approved_draft.json
+          else
+            echo "DEVTO_API_KEY not set — skipping Dev.to publish"
+          fi
+
       - name: Record posted topic
         if: success()
         run: |

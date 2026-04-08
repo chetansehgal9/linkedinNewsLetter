@@ -21,6 +21,21 @@ module.exports = async ({ github, context }) => {
   // Embed the full draft JSON so the post workflow can extract it
   const hiddenJson = `<!-- DRAFT_JSON\n${JSON.stringify(draft)}\nDRAFT_JSON -->`;
 
+  // Blog preview section
+  const blog = draft.blog || {};
+  const blogPreview = blog.body ? blog.body.slice(0, 400) + '...' : '_Not generated_';
+  const blogSection = [
+    '<details>',
+    '<summary>📝 Blog Article Preview (Medium + Dev.to)</summary>',
+    '',
+    `**Title:** ${blog.title || title}`,
+    `**Tags:** ${(blog.tags || []).join(', ')}`,
+    '',
+    blogPreview,
+    '',
+    '</details>',
+  ].join('\n');
+
   const issueBody = [
     '## 📝 LinkedIn Draft Ready for Approval',
     '',
@@ -38,9 +53,13 @@ module.exports = async ({ github, context }) => {
     '',
     '---',
     '',
+    blogSection,
+    '',
+    '---',
+    '',
     '### How to approve',
     '- ✅ **Step 1 — Generate image preview:** Comment `approve`',
-    '- 📸 **Step 2 — Publish to LinkedIn:** Comment `post` after reviewing the image',
+    '- 📸 **Step 2 — Publish to LinkedIn + Medium + Dev.to:** Comment `post` after reviewing the image',
     '- 🚀 **Post without image:** Comment `post-no-image` to skip image generation',
     '- ✏️ **Edit then approve:** Edit the post text above, then comment `approve`',
     '- 🔄 **Regenerate with feedback:** Comment `recreate: [your feedback]`',
