@@ -59,6 +59,7 @@ jobs:
         env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN:   ${{ secrets.LINKEDIN_PERSON_URN }}
+          DEVTO_API_KEY:         ${{ secrets.DEVTO_API_KEY }}
           ISSUE_BODY:            ${{ github.event.issue.body }}
           EVENT_NAME:            ${{ github.event_name }}
           COMMENT_BODY:          ${{ github.event.comment.body }}
@@ -109,18 +110,20 @@ jobs:
             IMAGE_ARG="--image-path assets/drafts/preview.jpg"
           fi
 
-          python tools/post_linkedin.py --draft-file .tmp/approved_draft.json $IMAGE_ARG
-
-      - name: Publish to Dev.to
-        continue-on-error: true
-        env:
-          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
-        run: |
+          # Publish to Dev.to first so we can include the link in the LinkedIn post
+          DEVTO_URL=""
           if [ -n "$DEVTO_API_KEY" ]; then
-            python tools/post_devto.py --draft-file .tmp/approved_draft.json
-          else
-            echo "DEVTO_API_KEY not set — skipping Dev.to publish"
+            DEVTO_RESULT=$(python3 tools/post_devto.py --draft-file .tmp/approved_draft.json 2>/dev/null || echo "{}")
+            DEVTO_URL=$(python3 -c "import json,sys; d=json.loads('''$DEVTO_RESULT'''); print(d.get('url',''))" 2>/dev/null || echo "")
+            echo "Dev.to URL: $DEVTO_URL"
           fi
+
+          DEVTO_ARG=""
+          if [ -n "$DEVTO_URL" ]; then
+            DEVTO_ARG="--devto-url $DEVTO_URL"
+          fi
+
+          python3 tools/post_linkedin.py --draft-file .tmp/approved_draft.json $IMAGE_ARG $DEVTO_ARG
 
       - name: Record posted topic
         if: success()

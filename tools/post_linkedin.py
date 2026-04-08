@@ -223,7 +223,7 @@ def _raise_linkedin_error(resp: httpx.Response, payload: dict) -> None:
 
 # ── Public interface ───────────────────────────────────────────────────────────
 
-def post_draft(draft: dict, image_path: str | None = None) -> dict:
+def post_draft(draft: dict, image_path: str | None = None, devto_url: str = "") -> dict:
     """Publish an approved draft dict as a LinkedIn post.
 
     Args:
@@ -253,6 +253,10 @@ def post_draft(draft: dict, image_path: str | None = None) -> dict:
         tag_line = " ".join(f"#{t.lstrip('#')}" for t in hashtags)
         if tag_line not in body_text:
             body_text = f"{body_text}\n\n{tag_line}"
+
+    # Append Dev.to blog link
+    if devto_url:
+        body_text = f"{body_text}\n\n📖 Read the full article on Dev.to: {devto_url}"
 
     # Append primary source article link
     news_sources = draft.get("sources", {}).get("news", [])
@@ -285,6 +289,7 @@ def main():
     parser.add_argument("--body",  help="Post body text (plain text, alternative to --draft-file)")
     parser.add_argument("--title", default="", help="Article title")
     parser.add_argument("--image-path", help="Path to image file to attach to the post")
+    parser.add_argument("--devto-url", default="", help="Dev.to article URL to append to the post")
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -318,7 +323,7 @@ def main():
         sys.exit(0)
 
     try:
-        result = post_draft(draft, image_path=args.image_path)
+        result = post_draft(draft, image_path=args.image_path, devto_url=args.devto_url)
         print(json.dumps(result, indent=2))
         url = result.get("article_url") or result.get("newsletter_url", "")
         print(f"\nPublished to newsletter: {url}", file=sys.stderr)
