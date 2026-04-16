@@ -106,16 +106,16 @@ jobs:
           fi
 
           IMAGE_ARG=""
-          if [ "$SKIP_IMAGE" = "false" ] && [ -f "assets/drafts/preview.jpg" ]; then
-            IMAGE_ARG="--image-path assets/drafts/preview.jpg"
+          if [ "$SKIP_IMAGE" = "false" ] && [ -f "assets/drafts/preview.png" ]; then
+            IMAGE_ARG="--image-path assets/drafts/preview.png"
           fi
 
           # Publish to Dev.to first so we can include the link in the LinkedIn post
           DEVTO_URL=""
           if [ -n "$DEVTO_API_KEY" ]; then
-            COVER_IMAGE_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/assets/drafts/preview.jpg"
+            COVER_IMAGE_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/assets/drafts/preview.png"
           COVER_ARG=""
-          if [ -f "assets/drafts/preview.jpg" ]; then
+          if [ -f "assets/drafts/preview.png" ]; then
             COVER_ARG="--cover-image-url $COVER_IMAGE_URL"
           fi
           DEVTO_RESULT=$(python3 tools/post_devto.py --draft-file .tmp/approved_draft.json $COVER_ARG 2>/dev/null || echo "{}")

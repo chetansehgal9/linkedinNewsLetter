@@ -37,6 +37,7 @@ jobs:
       - name: Extract draft and generate image
         id: generate
         env:
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
           ISSUE_BODY:          ${{ github.event.issue.body }}
         run: |
@@ -69,22 +70,25 @@ jobs:
           print(f"Draft extracted: {draft.get('title', 'Untitled')}")
           PYEOF
 
-          # Fetch image from Unsplash (failures are non-fatal)
-          if [ -n "$UNSPLASH_ACCESS_KEY" ]; then
-            TITLE=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('title',''))")
-            HOOK=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('hook',''))")
-            if python tools/generate_image.py \
+          # Generate content-specific image (diagram or photo) — failures are non-fatal
+          TITLE=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('title',''))")
+          HOOK=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('hook',''))")
+          BLOG_BODY=$(python3 -c "import json; d=json.load(open('.tmp/approved_draft.json')); print(d.get('blog', {}).get('body', ''))")
+
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            if python tools/generate_smart_image.py \
               --title "$TITLE" \
+              --blog-body "$BLOG_BODY" \
               --hook "$HOOK" \
-              --output assets/drafts/preview.jpg; then
+              --output assets/drafts/preview.png; then
               echo "image_generated=true" >> "$GITHUB_OUTPUT"
             else
-              echo "WARNING: Image generation failed — will post without image" >&2
+              echo "WARNING: Smart image generation failed — will post without image" >&2
               echo "image_generated=false" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "image_generated=false" >> "$GITHUB_OUTPUT"
-            echo "WARNING: UNSPLASH_ACCESS_KEY not set — skipping image fetch"
+            echo "WARNING: ANTHROPIC_API_KEY not set — skipping image generation"
           fi
 
       - name: Commit preview image
@@ -92,7 +96,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add assets/drafts/preview.jpg
+          git add assets/drafts/preview.png
           git commit -m "chore: update draft preview image [skip ci]"
           git push
 
@@ -107,7 +111,7 @@ jobs:
             const repo  = context.repo.repo;
 
             const imageSection = imageGenerated
-              ? `### 🖼️ Generated Image\n\n![Post Image](https://raw.githubusercontent.com/${owner}/${repo}/main/assets/drafts/preview.jpg)\n\n`
+              ? `### 🖼️ Generated Image\n\n![Post Image](https://raw.githubusercontent.com/${owner}/${repo}/main/assets/drafts/preview.png)\n\n`
               : `> ⚠️ Image generation skipped (OPENAI_API_KEY not set)\n\n`;
 
             const body = [
