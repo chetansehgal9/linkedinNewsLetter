@@ -38,7 +38,7 @@ LINKEDIN_USERINFO_URL = "https://api.linkedin.com/v2/userinfo"
 LINKEDIN_IMAGES_URL   = "https://api.linkedin.com/rest/images"
 
 # LinkedIn REST API version — bump this if LinkedIn rejects the request
-LINKEDIN_VERSION = "202504"
+LINKEDIN_VERSION = "202601"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
