@@ -75,6 +75,8 @@ topics unless they are directly tied to an AI use case or AI system design.
 - Include 3–5 AI-focused hashtags at the end (#AI #LLM #GenerativeAI #AIEngineering #MachineLearning etc.)
 - If a YouTube video is provided, extract the core AI idea and make that the post's spine
 - End with a pointed question or concrete takeaway for an AI-practitioner audience
+- Prioritise the most recently published news item as your primary source angle
+- If a news item was published in the last 48 hours, lead with its recency ("Just dropped:", "This week:", "Released yesterday:") — freshness is a signal of credibility
 - Do NOT use generic opener phrases like "In today's fast-paced world..." or "I'm excited to share..."
 - Do NOT frame posts as "two stories" or narrative journalism
 - Do NOT write about topics unrelated to AI (Go, Rust, Kubernetes, etc.) unless directly AI-adjacent

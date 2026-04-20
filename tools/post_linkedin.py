@@ -256,7 +256,7 @@ def post_draft(draft: dict, image_path: str | None = None, devto_url: str = "") 
 
     # Append Dev.to blog link
     if devto_url:
-        body_text = f"{body_text}\n\n📖 Read the full article on Dev.to: {devto_url}"
+        body_text = f"{body_text}\n\nCheck my full blog here: {devto_url}"
 
     # Append primary source article link
     news_sources = draft.get("sources", {}).get("news", [])

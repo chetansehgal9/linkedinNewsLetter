@@ -26,10 +26,13 @@ load_dotenv()
 # Default feeds — override via NEWS_RSS_FEEDS env var or --feeds flag
 # Focused exclusively on AI: models, research, tools, and AI engineering
 DEFAULT_FEEDS = [
-    "https://importai.substack.com/feed",       # Import AI — AI research weekly
-    "https://lastweekin.ai/feed",               # Last Week in AI — news roundup
-    "https://tldr.tech/api/rss/ai",             # TLDR AI — curated AI news
-    "https://huggingface.co/blog/feed.xml",     # Hugging Face Blog — models & tools
+    "https://importai.substack.com/feed",                        # Import AI — AI research weekly
+    "https://lastweekin.ai/feed",                                # Last Week in AI — news roundup
+    "https://tldr.tech/api/rss/ai",                              # TLDR AI — curated daily
+    "https://huggingface.co/blog/feed.xml",                      # Hugging Face Blog — models & tools
+    "https://venturebeat.com/ai/feed/",                          # VentureBeat AI — breaking news daily
+    "https://the-decoder.com/feed/",                             # The Decoder — AI news daily
+    "https://www.artificialintelligence-news.com/feed/",         # AI News — daily
 ]
 
 
@@ -119,7 +122,7 @@ def fetch_all_news(
     feed_urls: list[str],
     max_per_feed: int = 5,
     topics: list[str] | None = None,
-    since_days: int | None = 14,
+    since_days: int | None = 7,
 ) -> list[dict]:
     """Fetch articles from all configured RSS feeds."""
     all_articles = []
