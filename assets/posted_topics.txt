@@ -1,3 +1,4 @@
 AI Agents That Learn on the Job Change Everything
 Software Engineers Are Building Agents Wrong
 Generalist Reasoning vs Scoped Autonomy: Choose Wisely
+DeepSeek-V4 Changes the Context Game for Agents
